@@ -11,19 +11,17 @@ class pnlp:
 
     def __init__(self, filename, negatives):
 
-        # take in file name
+        # take in file name and list of negative words
+
         # construct pnlp vals
         self.data = filename
-
         self.neg_words = negatives
         self.neg_ratio = 0
         self.nouns = []
-
         self.pos = 0
         self.neg = 0
         self.neu = 0
         self.text = ''
-
         self.word_length = 0
         self.noun_scores = {}
 
@@ -130,6 +128,8 @@ class pnlp:
 
         # call save results depending on list of strings of words from parsers
         self.text = dct
+
+        # save cleaned dict of texts
         self._save_results(dct)
 
     def _save_results(self, dct):
@@ -139,14 +139,23 @@ class pnlp:
         :return: none
         """
 
+        # make lists for 3 Vader sentiment scores
         pos = []
         neg = []
         neu = []
+
+        # list for negative ratio score
         neg_rat = []
+
+        # list of nouns
         noun_lst = []
+
+        # list for length of each text
         lengths = []
 
+        # iterate through each article
         for k, v in dct.items():
+
             # Create a SentimentIntensityAnalyzer object.
             sid_obj = SentimentIntensityAnalyzer()
 
@@ -154,44 +163,65 @@ class pnlp:
             # object returns sentiment dict with positivity, negativity, and neutrality
             sentiment_dict = sid_obj.polarity_scores(v)
 
+            # append 3 vader scores
             pos.append(sentiment_dict['pos'])
             neg.append(sentiment_dict['neg'])
             neu.append(sentiment_dict['neu'])
 
+            # set count of neg words to 0
             count = 0
+
+            # iterate through each word in article
             for word in v.split(" "):
+
+                # add 1 to count if there is negative word
                 if word in self.neg_words:
                     count += 1
 
+            # append to neg_ratio each negative word ratio
+            # calculated by dividing count of negative words and total count of words in article
             neg_rat.append(count/len(v.split(" ")))
 
+            # append length of article
             lengths.append(len(v.split(" ")))
 
+            # make text blob object and append all nouns for article with noun_phrases function
             blob = TextBlob(v)
             noun_lst.append(list(blob.noun_phrases))
 
-
+        # set word count length for year by summing length of all articles
         self.word_length = sum(lengths)
+
+        # save noun list
         self.nouns = noun_lst
+
+        # save average negative ratio for all articles of a year
         self.neg_ratio = sum(neg_rat)/len(neg_rat)
-        # return person's positivity score (neu for neutral if interested)
+
+        # save articles' average sentiment scores
         self.pos = sum(pos) / len(pos)
         self.neg = sum(neg) / len(neg)
         self.neu = sum(neu) / len(neu)
 
+        # make nouns for all articles into one list
         nouns = list(itertools.chain.from_iterable(noun_lst))
 
+        # make dict for noun counts
         noun_dct = {}
+
+        # iterate through all nouns
         for word in nouns:
+
+            # clean nouns
             if "<" not in word and ">" not in word and word != '’ s' and '"' not in word:
+
+                # add new nouns to dict
                 if word not in noun_dct:
                     noun_dct[word] = 1
+
+                # add 1 to count of preexisting nouns
                 else:
                     noun_dct[word] += 1
 
-        """
-        for k,v in dct.items():
-            dct[k] = v / nyt_a_2013.word_length
-        """
-
+        # save sorted noun score dictionary
         self.noun_scores = dict(sorted(noun_dct.items(), key=lambda item: item[1], reverse=True))
