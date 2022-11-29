@@ -1,5 +1,11 @@
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import json
+from textblob import TextBlob
+import nltk
+import itertools
+#nltk.download('brown')
+#nltk.download('punkt')
+
 
 class pnlp:
 
@@ -11,10 +17,15 @@ class pnlp:
 
         self.neg_words = negatives
         self.neg_ratio = 0
+        self.nouns = []
 
         self.pos = 0
         self.neg = 0
         self.neu = 0
+        self.text = ''
+
+        self.word_length = 0
+        self.noun_scores = {}
 
     @staticmethod
     def _nyt_parser(self):
@@ -118,6 +129,7 @@ class pnlp:
             dct = pnlp._nyt_parser(self)
 
         # call save results depending on list of strings of words from parsers
+        self.text = dct
         self._save_results(dct)
 
     def _save_results(self, dct):
@@ -131,6 +143,8 @@ class pnlp:
         neg = []
         neu = []
         neg_rat = []
+        noun_lst = []
+        lengths = []
 
         for k, v in dct.items():
             # Create a SentimentIntensityAnalyzer object.
@@ -151,12 +165,33 @@ class pnlp:
 
             neg_rat.append(count/len(v.split(" ")))
 
+            lengths.append(len(v.split(" ")))
 
+            blob = TextBlob(v)
+            noun_lst.append(list(blob.noun_phrases))
+
+
+        self.word_length = sum(lengths)
+        self.nouns = noun_lst
         self.neg_ratio = sum(neg_rat)/len(neg_rat)
         # return person's positivity score (neu for neutral if interested)
         self.pos = sum(pos) / len(pos)
         self.neg = sum(neg) / len(neg)
         self.neu = sum(neu) / len(neu)
 
+        nouns = list(itertools.chain.from_iterable(noun_lst))
 
+        noun_dct = {}
+        for word in nouns:
+            if "<" not in word and ">" not in word and word != '’ s' and '"' not in word:
+                if word not in noun_dct:
+                    noun_dct[word] = 1
+                else:
+                    noun_dct[word] += 1
 
+        """
+        for k,v in dct.items():
+            dct[k] = v / nyt_a_2013.word_length
+        """
+
+        self.noun_scores = dict(sorted(noun_dct.items(), key=lambda item: item[1], reverse=True))
