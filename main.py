@@ -15,10 +15,10 @@ import wordcloud as wc
 import nltk
 from nltk.corpus import stopwords
 #nltk.download('stopwords')
+import base64
 
 import warnings
 warnings.filterwarnings("ignore")
-app = Dash(__name__)
 
 def load_neg_words(filename):
     """
@@ -199,24 +199,24 @@ def parallel(start, end, topic, negs):
     # load texts for year of interest
     nyt_texts, nyp_texts, df = load_topic(start, end, topic, negs)
 
-    # make nyt df from only nyt columns in nyt
-    nyt_df = df[['year', 'nyt-pos', 'nyt-neg', 'nyt-neu', 'nyt-neg_ratio']]
+    # make nyt df from only nyt columns
+    nyt_df = df[['year', 'nyt-pos', 'nyt-neu', 'nyt-neg']]
 
     # rename columns
     nyt_df.rename(
-        columns={'nyt-pos': 'Positive Sentiment', 'nyt-neg': 'Negative Sentiment', 'nyt-neu': 'Neural Sentiment',
-                 'nyt-neg_ratio': 'Negative Sentiment Ratio'}, inplace=True)
+        columns={'nyt-pos': 'Positive Sentiment', 'nyt-neu': 'Neutral Sentiment',
+                 'nyt-neg': 'Negative Sentiment'}, inplace=True)
 
-    # make jounral column
+    # make journal column
     nyt_df['Journal'] = [0] * len(nyt_df)
 
-    # make nyt df from only nyt columns in nyt
-    nyp_df = df[['year', 'nyp-pos', 'nyp-neg', 'nyp-neu', 'nyp-neg_ratio']]
+    # make nyp df from only nyp columns
+    nyp_df = df[['year', 'nyp-pos', 'nyp-neu', 'nyp-neg']]
 
     # rename columns
     nyp_df.rename(
-        columns={'nyp-pos': 'Positive Sentiment', 'nyp-neg': 'Negative Sentiment', 'nyp-neu': 'Neural Sentiment',
-                 'nyp-neg_ratio': 'Negative Sentiment Ratio'}, inplace=True)
+        columns={'nyp-pos': 'Positive Sentiment', 'nyp-neu': 'Neutral Sentiment',
+                 'nyp-neg': 'Negative Sentiment'}, inplace=True)
 
     # make jounral column
     nyp_df['Journal'] = [1] * len(nyp_df)
@@ -226,8 +226,7 @@ def parallel(start, end, topic, negs):
 
     # create vis figure
     parallel_fig = px.parallel_coordinates(parallel_df, color='Journal',
-                                           dimensions=['Positive Sentiment', 'Negative Sentiment', 'Neural Sentiment',
-                                                       'Negative Sentiment Ratio'],
+                                           dimensions=['Positive Sentiment', 'Neutral Sentiment', 'Negative Sentiment'],
                                            color_continuous_scale=px.colors.diverging.Tealrose,
                                            color_continuous_midpoint=0.5
                                            )
@@ -419,14 +418,20 @@ def main():
 
     # establish title and topic
     topic = 'abortion'
-    title = f'NLP Comparison of Prevalent Social Issues: {topic}'
+    title = f'NLP Comparison of Prevalent Social Issues: {" ".join([x.capitalize() for x in topic.split()])}'
+
+    nyt_imagefile = 'NYTLogo.jpeg'
+    nyt_encoded = base64.b64encode(open(nyt_imagefile, 'rb').read()).decode('ascii')
+
+    nyp_imagefile = 'NYPLogo.jpeg'
+    nyp_encoded = base64.b64encode(open(nyp_imagefile, 'rb').read()).decode('ascii')
 
     # load texts for topic
     nyt_texts, nyp_texts, df = load_topic(2002, 2022, topic, negs)
 
     # make vis figures
     s = sank(8, 2013, topic, negs)
-    p = parallel(2002, 2022, topic, negs)
+    p = parallel(2002, 2002, topic, negs)
     w1, w2 = wordcloud(nyt_texts, nyp_texts, topic)
     st = stacked(df, topic, negs)
 
@@ -434,12 +439,29 @@ def main():
     poss_years = list(range(2002, 2023))
 
     # make app
-    app = Dash(__name__)
+    external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+    app = Dash(__name__, external_stylesheets=external_stylesheets)
     app.layout = html.Div(id='App', children=[
 
-        # set title
-        html.Div(id='title_words', children=[
-            html.H1(title, style={'text-align': 'center'})]),
+        # top line of Dash
+        html.Div([
+
+            # first logo
+            html.Div([
+                html.Img(src='data:image/png;base64,{}'.format(nyt_encoded))],
+                style={'width': '10%', 'display': 'inline'}),
+
+            # set title
+            html.Div(id='title_words', children=[
+                html.H1(title, style={'text-align': 'center'})],
+                     style={'width':'50%', 'display':'inline'}),
+
+            # second logo
+            html.Div([
+                html.Img(src='data:image/png;base64,{}'.format(nyp_encoded))],
+                style={'width': '10%', 'display': 'inline'})],
+        style={'display':'flex'}),
 
         # dropdown for topics
         html.Div(id='Topic', children=[
@@ -447,29 +469,31 @@ def main():
                          options=['abortion', 'gay marriage', 'marijuana'],
                          value='abortion')]),
 
+        dcc.Tabs([
         # sankey figure with dropdown
-        html.Div(id='Sankey', children=[
+        dcc.Tab(label='SankeyTab', children=[
             html.H4('Most Common Words', style={'text-align': 'center'}),
             dcc.Graph(id='sankey_fig', figure=s),
             dcc.Dropdown(id='sankey_year', options=poss_years, value=2013)]),
 
         # parallel fig with slider
-        html.Div(id='Parallel', children=[
+        dcc.Tab(label='ParallelTab', children=[
             html.H4('Sentiment Parallel Coordinates', style={'text-align': 'center'}),
             dcc.Graph(id='parallel_fig', figure=p),
-            dcc.RangeSlider(id='parallel_years', min=2002, max=2022, step=1, value=[2002, 2022],
+            dcc.Slider(id='parallel_year', min=2002, max=2022, step=1, value=2002,
                             marks={opacity: f'{opacity:.0f}' for opacity in poss_years})]),
 
         # wordcloud figs
-        html.Div(id='Wordcloud', children=[
+        dcc.Tab(label='WordcloudTab', children=[
+            html.Div(id='Wordclouds', children=[
             html.Div([dcc.Graph(id='wordcloud_nyt', figure=w1)], style={'width': '50%', 'display': 'inline'}),
             html.Div([dcc.Graph(id='wordcloud_nyp', figure=w2)], style={'width': '50%', 'display': 'inline'})],
-                 style={'display': 'flex'}),
+                 style={'display': 'flex'})]),
 
         # stacked fig
-        html.Div(id='Stacked', children=[
+        dcc.Tab(label='Stacked', children=[
             dcc.Graph(id='stacked', figure=st)]),
-    ])
+    ])])
 
     # callback
     @app.callback(
@@ -480,10 +504,10 @@ def main():
         Output(component_id='stacked', component_property='figure'),
         Output(component_id='title_words', component_property='children'),
         [Input(component_id='sankey_year', component_property='value'),
-         Input(component_id='parallel_years', component_property='value'),
+         Input(component_id='parallel_year', component_property='value'),
          Input(component_id='topic-selector', component_property='value')]
     )
-    def _refresh_visualizations(sankey_year, parallel_years, topic):
+    def _refresh_visualizations(sankey_year, parallel_year, topic):
         """
         reload texts for new topix
         :param sankey_year: (int) year of interest
@@ -497,12 +521,12 @@ def main():
 
         # make figs
         s = sank(8, sankey_year, topic, negs)
-        p = parallel(parallel_years[0], parallel_years[1], topic, negs)
+        p = parallel(parallel_year, parallel_year, topic, negs)
         w1, w2 = wordcloud(nyt_texts, nyp_texts, topic)
         st = stacked(df, topic, negs)
 
         # make title and header
-        title = f'NLP Comparison of Prevalent Social Issues: {topic}'
+        title = f'NLP Comparison of Prevalent Social Issues: {" ".join([x.capitalize() for x in topic.split()])}'
         header = html.H1(title, style={'text-align': 'center'})
 
         return s, p, w1, w2, st, header
