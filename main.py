@@ -449,8 +449,9 @@ def main():
 
             # first logo
             html.Div([
-                html.Img(src='data:image/png;base64,{}'.format(nyt_encoded))],
-                style={'width': '10%', 'display': 'inline'}),
+                html.Img(src='data:image/png;base64,{}'.format(nyt_encoded),
+                         style={'height':'80%', 'width':'80%'})],
+                style={'width': '25%', 'display': 'inline'}),
 
             # set title
             html.Div(id='title_words', children=[
@@ -459,41 +460,46 @@ def main():
 
             # second logo
             html.Div([
-                html.Img(src='data:image/png;base64,{}'.format(nyp_encoded))],
-                style={'width': '10%', 'display': 'inline'})],
+                html.Img(src='data:image/png;base64,{}'.format(nyp_encoded),
+                         style={'height':'80%', 'width':'100%'})],
+                style={'width': '25%', 'display': 'inline'})],
         style={'display':'flex'}),
 
         # dropdown for topics
         html.Div(id='Topic', children=[
             dcc.Dropdown(id='topic-selector',
                          options=['abortion', 'gay marriage', 'marijuana'],
-                         value='abortion')]),
+                         value='abortion',
+                         style={'width':'40%'})],
+                 style={'align-items': 'center', 'justify-content': 'center'}),
 
         dcc.Tabs([
         # sankey figure with dropdown
-        dcc.Tab(label='SankeyTab', children=[
+        dcc.Tab(label='Sankey Diagram by Year', children=[
             html.H4('Most Common Words', style={'text-align': 'center'}),
             dcc.Graph(id='sankey_fig', figure=s),
-            dcc.Dropdown(id='sankey_year', options=poss_years, value=2013)]),
+            dcc.Dropdown(id='sankey_year', options=poss_years, value=2013)],
+                style={'backgroundColor':'#207947'}),
 
         # parallel fig with slider
-        dcc.Tab(label='ParallelTab', children=[
+        dcc.Tab(label='Parallel Coordinate Sentiment Comparison', children=[
             html.H4('Sentiment Parallel Coordinates', style={'text-align': 'center'}),
             dcc.Graph(id='parallel_fig', figure=p),
             dcc.Slider(id='parallel_year', min=2002, max=2022, step=1, value=2002,
                             marks={opacity: f'{opacity:.0f}' for opacity in poss_years})]),
 
         # wordcloud figs
-        dcc.Tab(label='WordcloudTab', children=[
+        dcc.Tab(label='Wordcloud Comparison', children=[
             html.Div(id='Wordclouds', children=[
             html.Div([dcc.Graph(id='wordcloud_nyt', figure=w1)], style={'width': '50%', 'display': 'inline'}),
             html.Div([dcc.Graph(id='wordcloud_nyp', figure=w2)], style={'width': '50%', 'display': 'inline'})],
                  style={'display': 'flex'})]),
 
         # stacked fig
-        dcc.Tab(label='Stacked', children=[
+        dcc.Tab(label='Stacked Plot', children=[
             dcc.Graph(id='stacked', figure=st)]),
-    ])])
+    ])],
+                          style={'backgroundColor':'#207947'})
 
     # callback
     @app.callback(
