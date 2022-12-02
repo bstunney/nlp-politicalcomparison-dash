@@ -1,9 +1,8 @@
 from political_nlp import pnlp
 import pandas as pd
 import plotly.graph_objects as go
-import itertools
 import sankey
-import matplotlib.pyplot as plt
+
 
 from dash import Dash, html, dcc, Input, Output
 import plotly.express as px
@@ -14,6 +13,9 @@ import string
 import wordcloud as wc
 import nltk
 from nltk.corpus import stopwords
+import base64
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
 
 nltk.download('stopwords')
 import base64
@@ -50,9 +52,10 @@ def load_neg_words(filename):
 negs = load_neg_words("negative-words.txt")
 
 # saves the topics and their important event info dict as a global variable
-topics = {'abortion': {'x_vline':19, 'x_annotation':18.6, 'text': 'Roe v Wade Overturned'}, \
-                  'gay marriage':{'x_vline':13, 'x_annotation':12.6, 'text': 'Gay Marriage Legalized'},\
-                  'marijuana':{'x_vline':7, 'x_annotation':6.6, 'text': 'DOJ Lenient to Medical Marijuana Patients'}}
+topics = {'abortion': {'x_vline': 19, 'x_annotation': 18.6, 'text': 'Roe v Wade Overturned'}, \
+          'gay marriage': {'x_vline': 13, 'x_annotation': 12.6, 'text': 'Gay Marriage Legalized'}, \
+          'marijuana': {'x_vline': 7, 'x_annotation': 6.6, 'text': 'DOJ Lenient to Medical Marijuana Patients'}}
+
 
 def load_topic(start, end, topic, negs):
     """
@@ -138,12 +141,11 @@ def load_topic(start, end, topic, negs):
     return nyt_passages, nyp_passages, df
 
 
-def wordcloud(nyt_texts, nyp_texts, year):
+def wordcloud(nyt_texts, nyp_texts):
     """
 
-    :param nyt_texts:
-    :param nyp_texts:
-    :param year:
+    :param nyt_texts: (dict) all article text for nyt with year/text for key/val
+    :param nyp_texts: (dict) all article text for nytpwith year/text for key/val
     :return:
     """
 
@@ -205,7 +207,7 @@ def parallel(start, end, topic, negs):
     :param topic: (str) topic of interest
     :param start: (int) start year of interest
     :param end: (int) end year of interest
-    :return: parellel_fig: figure
+    :return: parallel_fig: (fig) parallel coord fig
     """
     # load texts for year of interest
     nyt_texts, nyp_texts, df = load_topic(start, end, topic, negs)
@@ -320,6 +322,7 @@ def stacked(df, topic, topic_dict, negs):
     """
     make stacked scatter vis fig
     :param df: (dataframe) df of all sentiment score averages for each year of a topic byt nyt and nyp
+    :param topic: (str) topic of interest
     :param topic_dict: (dict) topic of interest as key, numbers for event line as values
     :param negs: (lst) list of all neg words
     :return: fig
@@ -424,7 +427,7 @@ def stacked(df, topic, topic_dict, negs):
             ticksuffix='%'))
 
     # adds a vertical line delineating an important event relating to the current topic
-    for k,v in topic_dict.items():
+    for k, v in topic_dict.items():
         if topic == k:
             stackfig.add_vline(x=v['x_vline'], line_width=3, line_dash="dash", line_color="black", layer='above')
             stackfig.add_annotation(x=v['x_annotation'], text=v['text'], showarrow=False, textangle=-90)
@@ -433,10 +436,123 @@ def stacked(df, topic, topic_dict, negs):
     return stackfig
 
 
+def word_normalization(nyt_texts, nyp_texts):
+    """
+
+    Parameters
+    ----------
+    nyt_texts
+    nyp_texts
+
+    Returns
+    -------
+
+    """
+    stops = list(set(stopwords.words('english')))
+    df = pd.DataFrame(columns=["text", "news_outlet"])
+
+    for year in range(2002, 2023):
+        nyt_string = nyt_texts[year]
+        nyp_string = nyp_texts[year]
+
+        # remove numbers from strings
+        nyt_string = re.sub(r'\d+', '', nyt_string)
+        nyp_string = re.sub(r'\d+', '', nyp_string)
+
+        # remove other punctuation
+        nyt_string = re.sub(r'[^\w\s]', '', nyt_string)
+        nyp_string = re.sub(r'[^\w\s]', '', nyp_string)
+
+        # split strings
+        nyt = nyt_string.split()
+        nyp = nyp_string.split()
+
+        # remove stop words
+        for word in stops:
+            nyt = [value for value in nyt if value != word]
+            nyp = [value for value in nyp if value != word]
+
+        # rejoin to string
+        nyt = ' '.join(nyt)
+        nyp = ' '.join(nyp)
+
+        df = df.append({"text": nyt, "news_outlet": "nyt"}, ignore_index=True)
+        df = df.append({"text": nyp, "news_outlet": "nyp"}, ignore_index=True)
+
+    return df
+
+
+def topic_modelling(df):
+    # initialize count vectorizer
+    cv = CountVectorizer(max_df=.95, min_df=2)
+
+    # create document term matrix
+    dtm = cv.fit_transform(df["text"])
+
+    # build lda model and fit to document term matrix
+    lda = LatentDirichletAllocation(n_components=5, random_state=42)
+    lda.fit(dtm)
+
+    total_str = ''
+    # retrieve words of each topic
+    for i, topic in enumerate(lda.components_):
+        total_str = total_str + f"The top 15 words for topic #{i}\n"
+        words = [cv.get_feature_names()[index] for index in topic.argsort()[-15:]]
+        topics_str = ', '.join(str(item) for item in words)
+        total_str = total_str + topics_str + '\n\n'
+
+    topic_results = lda.transform(dtm)
+    df["topic"] = topic_results.argmax(axis=1)
+
+    return df, total_str
+
+
+def topic_modelling_graph(df, topic_title):
+    topics = df["topic"].unique()
+    topics.sort()
+
+    nyt_dict = {}
+    nyp_dict = {}
+    for topic in topics:
+        nyt_dict[topic] = 0
+        nyp_dict[topic] = 0
+
+    nyt_df = df[df["news_outlet"] == "nyt"]
+    nyt_counts = nyt_df.groupby(["topic"]).size().reset_index(name='counts')
+
+    for index, row in nyt_counts.iterrows():
+        if row["topic"] in nyt_dict:
+            nyt_dict[row["topic"]] = row["counts"]
+
+    nyp_df = df[df["news_outlet"] == "nyp"]
+    nyp_counts = nyp_df.groupby(["topic"]).size().reset_index(name='counts')
+
+    for index, row in nyp_counts.iterrows():
+        if row["topic"] in nyp_dict:
+            nyp_dict[row["topic"]] = row["counts"]
+
+    nyt_vals = list(nyt_dict.values())
+    nyp_vals = list(nyp_dict.values())
+
+    fig = go.Figure(data=[
+        go.Bar(name="NYT", x=topics, y=nyt_vals),
+        go.Bar(name="NYP", x=topics, y=nyp_vals)
+    ])
+    title = f"NYT vs NYP Topic Modelling Comparison: {topic_title}"
+    # Change the bar mode
+    fig.update_layout(barmode='group')
+    fig.update_layout(title=title,
+                      xaxis=dict(title="Topic Number"),
+                      yaxis=dict(title="Frequency")
+                      )
+    return fig
+
+
 def main():
     # establish title and topic
     topic = 'abortion'
-    title = f'NLP Comparison of Prevalent Social Issues: {" ".join([x.capitalize() for x in topic.split()])}'
+    title = 'NLP Comparison of Prevalent Social Issues: ' + topic.capitalize()
+    topic_graph_title = 'Sub Topics Generated Through Topic Modelling for ' + topic.capitalize()
 
     nyt_imagefile = 'NYTLogo.jpeg'
     nyt_encoded = base64.b64encode(open(nyt_imagefile, 'rb').read()).decode('ascii')
@@ -447,11 +563,16 @@ def main():
     # load texts for topic
     nyt_texts, nyp_texts, df = load_topic(2002, 2022, topic, negs)
 
+    # topic modelling functions
+    words_df = word_normalization(nyt_texts, nyp_texts)
+    words_df, text_str = topic_modelling(words_df)
+
     # make vis figures
     s = sank(8, 2013, topic, negs)
     p = parallel(2002, 2002, topic, negs)
-    w1, w2 = wordcloud(nyt_texts, nyp_texts, topic)
+    w1, w2 = wordcloud(nyt_texts, nyp_texts)
     st = stacked(df, topic, topics, negs)
+    bar = topic_modelling_graph(words_df, topic)
 
     # range of years, making the steps for the marks
     min_year = 2002
@@ -515,17 +636,26 @@ def main():
             dcc.Tab(label='Wordcloud Comparison', children=[
                 html.Div(id='Wordclouds', children=[
                     html.Div([dcc.Graph(id='wordcloud_nyt', figure=w1)], style={'width': '50%', 'display': 'inline'}),
-                    html.Div([dcc.Graph(id='wordcloud_nyp', figure=w2)], style={'width': '50%', 'display': 'inline'}),
-                    dcc.Slider(id='wordcloud_year', min=min_year, max=max_year, step=None, marks=marks, value=2002)],
+                    html.Div([dcc.Graph(id='wordcloud_nyp', figure=w2)],
+                             style={'width': '50%', 'display': 'inline'}), ],
                          style={'display': 'flex'})], style={'backgroundColor': '#207947'}),
 
             # stacked fig
             dcc.Tab(label='Stacked Plot', children=[
                 dcc.Graph(id='stacked', figure=st)], style={'backgroundColor': '#207947'}),
+
+            # topic modelling graph
+            dcc.Tab(label='Topic Modelling Comparison', children=[
+                html.H4(topic_graph_title, style={'text-align': 'center'}),
+                dcc.Textarea(id='sub_topics', value=text_str,
+                             style={'text-align': 'center', 'align-items': 'center', 'width': '100%', 'height': 300}),
+                dcc.Graph(id='barchart', figure=bar)],
+                    style={'backgroundColor': 'rgb(161,212,173)'})
         ])],
                           style={'backgroundColor': '#207947'})
 
-    # callbacks
+
+# callbacks
     @app.callback(
         Output(component_id='title_words', component_property='children'),
         Input(component_id='topic_selector', component_property='value')
@@ -557,34 +687,46 @@ def main():
 
     @app.callback(
         Output(component_id='wordcloud_nyt', component_property='figure'),
-        Input(component_id='wordcloud_year', component_property='value'),
         Input(component_id='topic_selector', component_property='value')
     )
-
-    def update_wordcloud_nyt(wordcloud_year, topic_selector):
+    def update_wordcloud_nyt(topic_selector):
         #nyt_texts, nyp_texts, df = load_topic(min_year, max_year, topic_selector, negs)
-        w1,w2 = wordcloud(nyt_texts, nyp_texts, wordcloud_year)
+        w1, w2 = wordcloud(nyt_texts, nyp_texts)
         return w1
 
     @app.callback(
         Output(component_id='wordcloud_nyp', component_property='figure'),
-        Input(component_id='wordcloud_year', component_property='value'),
         Input(component_id='topic_selector', component_property='value')
     )
-
-    def update_wordcloud_nyp(wordcloud_year, topic_selector):
+    def update_wordcloud_nyp(topic_selector):
         #nyt_texts, nyp_texts, df = load_topic(min_year, max_year, topic_selector, negs)
-        w1, w2 = wordcloud(nyt_texts, nyp_texts, wordcloud_year)
+        w1, w2 = wordcloud(nyt_texts, nyp_texts)
         return w2
 
     @app.callback(
         Output(component_id='stacked', component_property='figure'),
         Input(component_id='topic_selector', component_property='value')
     )
-
     def update_stacked(topic_selector):
         st = stacked(df, topic_selector, topics, negs)
         return st
+
+    @app.callback(
+        Output(component_id='barchart', component_property='figure'),
+        Input(component_id='topic_selector', component_property='value')
+    )
+    def update_bar(topic_selector):
+        #
+        # for time in range(0, 1):
+        #     nyt_texts, nyp_texts, df = load_topic(min_year, max_year, topic_selector, negs)
+
+        # topic modelling functions
+        words_df = word_normalization(nyt_texts, nyp_texts)
+        words_df, text_str = topic_modelling(words_df)
+
+        # update bar chart
+        bar_graph = topic_modelling_graph(words_df, topic_selector)
+        return bar_graph
 
     # run server
     app.run_server(debug=True)
