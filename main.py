@@ -14,11 +14,14 @@ import string
 import wordcloud as wc
 import nltk
 from nltk.corpus import stopwords
-#nltk.download('stopwords')
+
+nltk.download('stopwords')
 import base64
 
 import warnings
+
 warnings.filterwarnings("ignore")
+
 
 def load_neg_words(filename):
     """
@@ -42,8 +45,14 @@ def load_neg_words(filename):
 
     return lst
 
+
 # make negative words list a global variable
 negs = load_neg_words("negative-words.txt")
+
+# saves the topics and their important event info dict as a global variable
+topics = {'abortion': {'x_vline':19, 'x_annotation':18.6, 'text': 'Roe v Wade Overturned'}, \
+                  'gay marriage':{'x_vline':13, 'x_annotation':12.6, 'text': 'Gay Marriage Legalized'},\
+                  'marijuana':{'x_vline':7, 'x_annotation':6.6, 'text': 'DOJ Lenient to Medical Marijuana Patients'}}
 
 def load_topic(start, end, topic, negs):
     """
@@ -65,7 +74,7 @@ def load_topic(start, end, topic, negs):
     first = True
 
     # for each year in specified range
-    for i in range(start, end+1):
+    for i in range(start, end + 1):
 
         # update which year is being loaded to user
         print("Loading for year:", i)
@@ -81,7 +90,7 @@ def load_topic(start, end, topic, negs):
         nyt_str = ""
 
         # add all article text to nyt_str
-        for k,v in nyt.text.items():
+        for k, v in nyt.text.items():
             new = re.sub('[' + string.punctuation + ']', '', v).lower().strip()
             nyt_str += new
 
@@ -89,7 +98,7 @@ def load_topic(start, end, topic, negs):
         nyt_passages[i] = nyt_str
 
         # make pnlp object for nyt year of interest and load text
-        nyp= pnlp(f"{topic}-nyp/nyp_{topic}_{i}.json", negs)
+        nyp = pnlp(f"{topic}-nyp/nyp_{topic}_{i}.json", negs)
         nyp.load_text("nyp")
 
         # make empty string
@@ -109,24 +118,25 @@ def load_topic(start, end, topic, negs):
             # make a df of first year of interest
             df = pd.DataFrame(
                 {'year': [i], "nyt-pos": [nyt.pos], "nyt-neg": [nyt.neg], "nyt-neu": [nyt.neu], "nyp-pos": [nyp.pos],
-                 "nyp-neg": [nyp.neg], "nyp-neu": [nyp.neu], "nyt-neg_ratio":[nyt.neg_ratio],
-                 "nyp-neg_ratio":[nyp.neg_ratio]})
+                 "nyp-neg": [nyp.neg], "nyp-neu": [nyp.neu], "nyt-neg_ratio": [nyt.neg_ratio],
+                 "nyp-neg_ratio": [nyp.neg_ratio]})
 
         # otherwise, make a new df for each year
         else:
             ndf = pd.DataFrame(
                 {'year': [i], "nyt-pos": [nyt.pos], "nyt-neg": [nyt.neg], "nyt-neu": [nyt.neu], "nyp-pos": [nyp.pos],
-                 "nyp-neg": [nyp.neg], "nyp-neu": [nyp.neu], "nyt-neg_ratio":[nyt.neg_ratio],
-                 "nyp-neg_ratio":[nyp.neg_ratio]})
+                 "nyp-neg": [nyp.neg], "nyp-neu": [nyp.neu], "nyt-neg_ratio": [nyt.neg_ratio],
+                 "nyp-neg_ratio": [nyp.neg_ratio]})
 
             # concat new df to first year of interest df
-            df = pd.concat([df,ndf])
+            df = pd.concat([df, ndf])
 
         # no longer = first iteration
         first = False
 
     # return nyt, nyp passages and stats df
     return nyt_passages, nyp_passages, df
+
 
 def wordcloud(nyt_texts, nyp_texts, year):
     """
@@ -187,6 +197,7 @@ def wordcloud(nyt_texts, nyp_texts, year):
     # return nyt and nyp wordcloud figs
     return fig1, fig2
 
+
 def parallel(start, end, topic, negs):
     """
     make parallel coordinates plot
@@ -232,6 +243,7 @@ def parallel(start, end, topic, negs):
                                            )
 
     return parallel_fig
+
 
 def sank(num_words, year, topic, negs):
     """
@@ -303,11 +315,12 @@ def sank(num_words, year, topic, negs):
     # return sankey figure
     return sankey.make_sankey(df, "src", "targ", "vals", year, topic)
 
-def stacked(df, topic, negs):
+
+def stacked(df, topic, topic_dict, negs):
     """
     make stacked scatter vis fig
     :param df: (dataframe) df of all sentiment score averages for each year of a topic byt nyt and nyp
-    :param topic: (str) topic of interest
+    :param topic_dict: (dict) topic of interest as key, numbers for event line as values
     :param negs: (lst) list of all neg words
     :return: fig
     """
@@ -327,7 +340,6 @@ def stacked(df, topic, negs):
 
     # iterate through sentiment stats df
     for i in range(len(df)):
-
         # append years
         year.append(df.iloc[i]['year'])
 
@@ -341,7 +353,7 @@ def stacked(df, topic, negs):
 
     # make subplots
     stackfig = make_subplots(rows=1, cols=2,
-                        subplot_titles=("NY Times", "NY Post"))
+                             subplot_titles=("NY Times", "NY Post"))
 
     # add stacked scatters for nyt vals in row 1, col 1
     # set all layout parameters
@@ -411,11 +423,17 @@ def stacked(df, topic, negs):
             range=[1, 100],
             ticksuffix='%'))
 
+    # adds a vertical line delineating an important event relating to the current topic
+    for k,v in topic_dict.items():
+        if topic == k:
+            stackfig.add_vline(x=v['x_vline'], line_width=3, line_dash="dash", line_color="black", layer='above')
+            stackfig.add_annotation(x=v['x_annotation'], text=v['text'], showarrow=False, textangle=-90)
+            stackfig.add_annotation(x=v['x_annotation'], xref='x2', text=v['text'], showarrow=False, textangle=-90)
     # return fig
     return stackfig
 
-def main():
 
+def main():
     # establish title and topic
     topic = 'abortion'
     title = f'NLP Comparison of Prevalent Social Issues: {" ".join([x.capitalize() for x in topic.split()])}'
@@ -433,10 +451,15 @@ def main():
     s = sank(8, 2013, topic, negs)
     p = parallel(2002, 2002, topic, negs)
     w1, w2 = wordcloud(nyt_texts, nyp_texts, topic)
-    st = stacked(df, topic, negs)
+    st = stacked(df, topic, topics, negs)
 
-    # range of years
-    poss_years = list(range(2002, 2023))
+    # range of years, making the steps for the marks
+    min_year = 2002
+    max_year = 2022
+    poss_years = list(range(min_year, max_year))
+    marks = {}
+    for num in range(min_year, max_year + 1, 1):
+        marks[num] = str(num)
 
     # make app
     external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -450,95 +473,122 @@ def main():
             # first logo
             html.Div([
                 html.Img(src='data:image/png;base64,{}'.format(nyt_encoded),
-                         style={'height':'80%', 'width':'80%'})],
+                         style={'height': '80%', 'width': '80%'})],
                 style={'width': '25%', 'display': 'inline'}),
 
             # set title
             html.Div(id='title_words', children=[
                 html.H1(title, style={'text-align': 'center'})],
-                     style={'width':'50%', 'display':'inline'}),
+                     style={'width': '50%', 'display': 'inline'}),
 
             # second logo
             html.Div([
                 html.Img(src='data:image/png;base64,{}'.format(nyp_encoded),
-                         style={'height':'80%', 'width':'100%'})],
+                         style={'height': '80%', 'width': '100%'})],
                 style={'width': '25%', 'display': 'inline'})],
-        style={'display':'flex'}),
+            style={'display': 'flex'}),
 
         # dropdown for topics
         html.Div(id='Topic', children=[
-            dcc.Dropdown(id='topic-selector',
+            dcc.Dropdown(id='topic_selector',
                          options=['abortion', 'gay marriage', 'marijuana'],
                          value='abortion',
-                         style={'width':'40%'})],
+                         style={'width': '40%'})],
                  style={'align-items': 'center', 'justify-content': 'center'}),
 
         dcc.Tabs([
-        # sankey figure with dropdown
-        dcc.Tab(label='Sankey Diagram by Year', children=[
-            html.H4('Most Common Words', style={'text-align': 'center'}),
-            dcc.Graph(id='sankey_fig', figure=s),
-            dcc.Dropdown(id='sankey_year', options=poss_years, value=2013)],
-                style={'backgroundColor':'#207947'}),
+            # sankey figure with dropdown
+            dcc.Tab(label='Sankey Diagram by Year', children=[
+                html.H4('Most Common Words', style={'text-align': 'center'}),
+                dcc.Graph(id='sankey_fig', figure=s),
+                dcc.Dropdown(id='sankey_year', options=poss_years, value=2013)],
+                    style={'backgroundColor': '#207947'}),
 
-        # parallel fig with slider
-        dcc.Tab(label='Parallel Coordinate Sentiment Comparison', children=[
-            html.H4('Sentiment Parallel Coordinates', style={'text-align': 'center'}),
-            dcc.Graph(id='parallel_fig', figure=p),
-            dcc.Slider(id='parallel_year', min=2002, max=2022, step=1, value=2002,
-                            marks={opacity: f'{opacity:.0f}' for opacity in poss_years})]),
+            # parallel fig with slider
+            dcc.Tab(label='Parallel Coordinate Sentiment Comparison', children=[
+                html.H4('Sentiment Parallel Coordinates', style={'text-align': 'center'}),
+                dcc.Graph(id='parallel_fig', figure=p),
+                dcc.Slider(id='parallel_year', min=min_year, max=max_year, step=None, marks=marks, value=2002)],
+                    style={'backgroundColor': '#207947'}),
 
-        # wordcloud figs
-        dcc.Tab(label='Wordcloud Comparison', children=[
-            html.Div(id='Wordclouds', children=[
-            html.Div([dcc.Graph(id='wordcloud_nyt', figure=w1)], style={'width': '50%', 'display': 'inline'}),
-            html.Div([dcc.Graph(id='wordcloud_nyp', figure=w2)], style={'width': '50%', 'display': 'inline'})],
-                 style={'display': 'flex'})]),
+            # wordcloud figs
+            dcc.Tab(label='Wordcloud Comparison', children=[
+                html.Div(id='Wordclouds', children=[
+                    html.Div([dcc.Graph(id='wordcloud_nyt', figure=w1)], style={'width': '50%', 'display': 'inline'}),
+                    html.Div([dcc.Graph(id='wordcloud_nyp', figure=w2)], style={'width': '50%', 'display': 'inline'}),
+                    dcc.Slider(id='wordcloud_year', min=min_year, max=max_year, step=None, marks=marks, value=2002)],
+                         style={'display': 'flex'})], style={'backgroundColor': '#207947'}),
 
-        # stacked fig
-        dcc.Tab(label='Stacked Plot', children=[
-            dcc.Graph(id='stacked', figure=st)]),
-    ])],
-                          style={'backgroundColor':'#207947'})
+            # stacked fig
+            dcc.Tab(label='Stacked Plot', children=[
+                dcc.Graph(id='stacked', figure=st)], style={'backgroundColor': '#207947'}),
+        ])],
+                          style={'backgroundColor': '#207947'})
 
-    # callback
+    # callbacks
+    @app.callback(
+        Output(component_id='title_words', component_property='children'),
+        Input(component_id='topic_selector', component_property='value')
+    )
+    def update_header(topic_selector):
+        # make title and header
+        title = 'NLP Comparison of Prevalent Social Issues: ' + topic_selector.capitalize()
+        header = html.H1(title, style={'text-align': 'center'})
+        return header
+
     @app.callback(
         Output(component_id='sankey_fig', component_property='figure'),
-        Output(component_id='parallel_fig', component_property='figure'),
-        Output(component_id='wordcloud_nyt', component_property='figure'),
-        Output(component_id='wordcloud_nyp', component_property='figure'),
-        Output(component_id='stacked', component_property='figure'),
-        Output(component_id='title_words', component_property='children'),
-        [Input(component_id='sankey_year', component_property='value'),
-         Input(component_id='parallel_year', component_property='value'),
-         Input(component_id='topic-selector', component_property='value')]
+        Input(component_id='sankey_year', component_property='value'),
+        Input(component_id='topic_selector', component_property='value')
     )
-    def _refresh_visualizations(sankey_year, parallel_year, topic):
-        """
-        reload texts for new topix
-        :param sankey_year: (int) year of interest
-        :param parallel_years:
-        :param topic: (str) topic of interest
-        :return: all figs
-        """
+    def update_sankey(sankey_year, topic_selector):
+        # updates sankey based on new topic and year
+        s = sank(8, sankey_year, topic_selector, negs)
+        return s
 
-        # reload data
-        nyt_texts, nyp_texts, df = load_topic(2002, 2022, topic, negs)
+    @app.callback(
+        Output(component_id='parallel_fig', component_property='figure'),
+        Input(component_id='parallel_year', component_property='value'),
+        Input(component_id='topic_selector', component_property='value')
+    )
+    def update_parallel(parallel_year, topic_selector):
+        p = parallel(parallel_year, parallel_year, topic_selector, negs)
+        return p
 
-        # make figs
-        s = sank(8, sankey_year, topic, negs)
-        p = parallel(parallel_year, parallel_year, topic, negs)
-        w1, w2 = wordcloud(nyt_texts, nyp_texts, topic)
-        st = stacked(df, topic, negs)
+    @app.callback(
+        Output(component_id='wordcloud_nyt', component_property='figure'),
+        Input(component_id='wordcloud_year', component_property='value'),
+        Input(component_id='topic_selector', component_property='value')
+    )
 
-        # make title and header
-        title = f'NLP Comparison of Prevalent Social Issues: {" ".join([x.capitalize() for x in topic.split()])}'
-        header = html.H1(title, style={'text-align': 'center'})
+    def update_wordcloud_nyt(wordcloud_year, topic_selector):
+        #nyt_texts, nyp_texts, df = load_topic(min_year, max_year, topic_selector, negs)
+        w1,w2 = wordcloud(nyt_texts, nyp_texts, wordcloud_year)
+        return w1
 
-        return s, p, w1, w2, st, header
+    @app.callback(
+        Output(component_id='wordcloud_nyp', component_property='figure'),
+        Input(component_id='wordcloud_year', component_property='value'),
+        Input(component_id='topic_selector', component_property='value')
+    )
+
+    def update_wordcloud_nyp(wordcloud_year, topic_selector):
+        #nyt_texts, nyp_texts, df = load_topic(min_year, max_year, topic_selector, negs)
+        w1, w2 = wordcloud(nyt_texts, nyp_texts, wordcloud_year)
+        return w2
+
+    @app.callback(
+        Output(component_id='stacked', component_property='figure'),
+        Input(component_id='topic_selector', component_property='value')
+    )
+
+    def update_stacked(topic_selector):
+        st = stacked(df, topic_selector, topics, negs)
+        return st
 
     # run server
     app.run_server(debug=True)
+
 
 if __name__ == "__main__":
     main()
