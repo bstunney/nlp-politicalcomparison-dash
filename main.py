@@ -64,7 +64,10 @@ topics = {'abortion': [{'x_vline':20, 'x_annotation': 19.6, 'text': 'Roe v Wade 
             {'x_vline': 8, 'x_annotation': 7.6, 'text': 'Prop 8 deemed unconstitutional'}],
           'marijuana': [{'x_vline': 7, 'x_annotation': 6.6, 'text': 'DOJ Lenient to Medical Marijuana Patients'},
             {'x_vline': 12, 'x_annotation': 11.6, 'text': 'Rohrabacher–Farr amendment'},
-            {'x_vline': 16, 'x_annotation': 15.6, 'text': 'CBD leaglized'}]}
+            {'x_vline': 16, 'x_annotation': 15.6, 'text': 'CBD leaglized'}]
+          'immigration': [{'x_vline':0, 'x_annotation':0.6, 'text': 'Homeland Security Act'}, \
+                          {'x_vline':10, 'x_annotation':9.6, 'text':'DACA established'}, \
+                          {'x_vline': 15, 'x_annotation':14.6, 'text':'Muslim Travel Ban'}]}
 
 
 
