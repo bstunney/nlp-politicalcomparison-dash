@@ -13,7 +13,6 @@ import string
 import wordcloud as wc
 import nltk
 from nltk.corpus import stopwords
-import base64
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
 
@@ -52,9 +51,21 @@ def load_neg_words(filename):
 negs = load_neg_words("negative-words.txt")
 
 # saves the topics and their important event info dict as a global variable
-topics = {'abortion': {'x_vline': 19, 'x_annotation': 18.6, 'text': 'Roe v Wade Overturned'}, \
-          'gay marriage': {'x_vline': 13, 'x_annotation': 12.6, 'text': 'Gay Marriage Legalized'}, \
-          'marijuana': {'x_vline': 7, 'x_annotation': 6.6, 'text': 'DOJ Lenient to Medical Marijuana Patients'}}
+topics = {'abortion': [{'x_vline':20, 'x_annotation': 19.6, 'text': 'Roe v Wade Overturned'},
+            {'x_vline': 5, 'x_annotation': 4.6, 'text': 'Gonzales v. Planned Parenthood'},
+            {'x_vline': 14, 'x_annotation': 13.6, 'text': "Whole Woman's Health v. Hellerstedt"},
+            {'x_vline': 18, 'x_annotation': 17.6, 'text': 'June Medical Services v. Russo'},
+            {'x_vline':19, 'x_annotation':18.6, 'text':'Texas Six-Week Ban'}],
+          'gay marriage': [{'x_vline': 13, 'x_annotation': 12.6, 'text': 'Gay Marriage Legalized Federally'},
+            {'x_vline': 1, 'x_annotation': 0.6, 'text': 'Lawrence v. Texas'},
+            {'x_vline': 2, 'x_annotation': 1.6, 'text': 'Mass Legalizes Gay Marriage'},
+            {'x_vline': 6, 'x_annotation': 5.6, 'text': 'Cali voters approve Proposition 8'},
+            {'x_vline': 7, 'x_annotation': 6.6, 'text': 'Matthew Shepard Act'},
+            {'x_vline': 8, 'x_annotation': 7.6, 'text': 'Prop 8 deemed unconstitutional'}],
+          'marijuana': [{'x_vline': 7, 'x_annotation': 6.6, 'text': 'DOJ Lenient to Medical Marijuana Patients'},
+            {'x_vline': 12, 'x_annotation': 11.6, 'text': 'Rohrabacher–Farr amendment'},
+            {'x_vline': 16, 'x_annotation': 15.6, 'text': 'CBD leaglized'}]}
+
 
 
 def load_topic(start, end, topic, negs):
@@ -317,6 +328,7 @@ def sank(num_words, year, topic, negs):
     # return sankey figure
     return sankey.make_sankey(df, "src", "targ", "vals", year, topic)
 
+#def event_line():
 
 def stacked(df, topic, topic_dict, negs):
     """
@@ -429,9 +441,10 @@ def stacked(df, topic, topic_dict, negs):
     # adds a vertical line delineating an important event relating to the current topic
     for k, v in topic_dict.items():
         if topic == k:
-            stackfig.add_vline(x=v['x_vline'], line_width=3, line_dash="dash", line_color="black", layer='above')
-            stackfig.add_annotation(x=v['x_annotation'], text=v['text'], showarrow=False, textangle=-90)
-            stackfig.add_annotation(x=v['x_annotation'], xref='x2', text=v['text'], showarrow=False, textangle=-90)
+            for i in range(len(v)):
+                stackfig.add_vline(x=v[i]['x_vline'], line_width=3, line_dash="dash", line_color="black", layer='above')
+                stackfig.add_annotation(x=v[i]['x_annotation'], text=v[i]['text'], showarrow=False, textangle=-90)
+                stackfig.add_annotation(x=v[i]['x_annotation'], xref='x2', text=v[i]['text'], showarrow=False, textangle=-90)
     # return fig
     return stackfig
 
