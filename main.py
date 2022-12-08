@@ -67,7 +67,12 @@ topics = {'abortion': [{'x_vline':20, 'x_annotation': 19.6, 'text': 'Roe v Wade 
             {'x_vline': 16, 'x_annotation': 15.6, 'text': 'CBD leaglized'}]
           'immigration': [{'x_vline':0, 'x_annotation':0.6, 'text': 'Homeland Security Act'}, \
                           {'x_vline':10, 'x_annotation':9.6, 'text':'DACA established'}, \
-                          {'x_vline': 15, 'x_annotation':14.6, 'text':'Muslim Travel Ban'}]}
+                          {'x_vline': 15, 'x_annotation':14.6, 'text':'Muslim Travel Ban'}],
+          'police brutality': [{'x_vline': 10, 'x_annotation': 9.6, 'text': 'Death of Trayvon Martin'}, \
+                          {'x_vline': 11, 'x_annotation': 10.6, 'text': 'BLM Created'}, \
+                          {'x_vline': 18, 'x_annotation': 17.6, 'text': 'Death of George Floyd'}]
+
+          }
 
 
 
