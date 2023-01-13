@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import sankey
 
-
 from dash import Dash, html, dcc, Input, Output
 import plotly.express as px
 from plotly.subplots import make_subplots
@@ -16,11 +15,10 @@ from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
 
-nltk.download('stopwords')
+#nltk.download('stopwords')
 import base64
 
 import warnings
-
 warnings.filterwarnings("ignore")
 
 
@@ -518,7 +516,7 @@ def topic_modelling(df):
     # retrieve words of each topic
     for i, topic in enumerate(lda.components_):
         total_str = total_str + f"The top 15 words for topic #{i}\n"
-        words = [cv.get_feature_names()[index] for index in topic.argsort()[-15:]]
+        words = [cv.get_feature_names_out()[index] for index in topic.argsort()[-15:]]
         topics_str = ', '.join(str(item) for item in words)
         total_str = total_str + topics_str + '\n\n'
 
